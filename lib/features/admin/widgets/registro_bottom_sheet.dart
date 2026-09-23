@@ -24,6 +24,8 @@ class _RegistroBottomSheetState extends ConsumerState<RegistroBottomSheet> {
   bool _hasSearched = false;
   String _lastQuery = '';
   List<Map<String, dynamic>> _searchResults = [];
+  List<Map<String, dynamic>> _defaultClients = [];
+  bool _isLoadingDefaultClients = false;
   Map<String, dynamic>? _selectedClient;
 
   // Step 1: Register Client
@@ -45,8 +47,74 @@ class _RegistroBottomSheetState extends ConsumerState<RegistroBottomSheet> {
   @override
   void initState() {
     super.initState();
+    _loadDefaultClients();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initDefaultBranch();
+    });
+  }
+
+  Future<void> _loadDefaultClients() async {
+    setState(() => _isLoadingDefaultClients = true);
+    final supabase = ref.read(supabaseClientProvider);
+    try {
+      List<dynamic> response;
+      try {
+        response = await supabase
+            .from('clientes')
+            .select('*')
+            .order('nombre', ascending: true)
+            .limit(100);
+      } catch (_) {
+        response = await supabase
+            .from('clientes')
+            .select('*')
+            .limit(100);
+      }
+
+      if (mounted) {
+        setState(() {
+          _defaultClients = response.map((e) => Map<String, dynamic>.from(e)).toList();
+          _isLoadingDefaultClients = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error cargando clientes predeterminados: $e');
+      if (mounted) {
+        setState(() => _isLoadingDefaultClients = false);
+      }
+    }
+  }
+
+  void _onSearchChanged(String value) {
+    final query = value.trim();
+    if (query.isEmpty) {
+      setState(() {
+        _hasSearched = false;
+        _searchResults.clear();
+      });
+      return;
+    }
+
+    List<Map<String, dynamic>> filtered = [];
+    if (_searchByPhone) {
+      final cleanDigits = query.replaceAll(RegExp(r'\D'), '');
+      filtered = _defaultClients.where((c) {
+        final t = (c['telefono'] ?? c['phone'] ?? '').toString().replaceAll(RegExp(r'\D'), '');
+        return t.contains(cleanDigits);
+      }).toList();
+    } else {
+      final lower = query.toLowerCase();
+      filtered = _defaultClients.where((c) {
+        final n = (c['nombre'] ?? c['name'] ?? '').toString().toLowerCase();
+        final email = (c['correo'] ?? c['email'] ?? '').toString().toLowerCase();
+        return n.contains(lower) || email.contains(lower);
+      }).toList();
+    }
+
+    setState(() {
+      _hasSearched = true;
+      _lastQuery = query;
+      _searchResults = filtered;
     });
   }
 
@@ -72,7 +140,13 @@ class _RegistroBottomSheetState extends ConsumerState<RegistroBottomSheet> {
 
   Future<void> _searchClient() async {
     final query = _searchCtrl.text.trim();
-    if (query.isEmpty) return;
+    if (query.isEmpty) {
+      setState(() {
+        _hasSearched = false;
+        _searchResults.clear();
+      });
+      return;
+    }
 
     setState(() {
       _isLoading = true;
@@ -178,6 +252,7 @@ class _RegistroBottomSheetState extends ConsumerState<RegistroBottomSheet> {
           .single();
       
       setState(() {
+        _defaultClients.insert(0, Map<String, dynamic>.from(response));
         _selectedClient = response;
         _currentStep = 2;
         _isLoading = false;
@@ -455,7 +530,20 @@ class _RegistroBottomSheetState extends ConsumerState<RegistroBottomSheet> {
                         )
                       : const Icon(Icons.search, color: AppColors.primary),
                   prefixIconConstraints: _searchByPhone ? const BoxConstraints(minWidth: 0, minHeight: 0) : null,
+                  suffixIcon: _searchCtrl.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear, size: 18, color: AppColors.textSecondary),
+                          onPressed: () {
+                            _searchCtrl.clear();
+                            setState(() {
+                              _hasSearched = false;
+                              _searchResults.clear();
+                            });
+                          },
+                        )
+                      : null,
                 ),
+                onChanged: _onSearchChanged,
                 onSubmitted: (_) => _searchClient(),
               ),
             ),
@@ -476,96 +564,120 @@ class _RegistroBottomSheetState extends ConsumerState<RegistroBottomSheet> {
         ),
         const SizedBox(height: 16),
 
-        // Resultados o estado vacío
+        // Lista de clientes (predeterminada o resultados de búsqueda)
         Expanded(
           child: _isLoading
               ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
-              : _searchResults.isNotEmpty
-                  ? Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Resultados encontrados (${_searchResults.length}):',
-                            style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textSecondary, fontSize: 13)),
-                        const SizedBox(height: 8),
-                        Expanded(
-                          child: ListView.separated(
-                            itemCount: _searchResults.length,
-                            separatorBuilder: (_, __) => const SizedBox(height: 8),
-                            itemBuilder: (context, index) {
-                              final client = _searchResults[index];
-                              final nombre = client['nombre'] ?? client['name'] ?? 'Sin nombre';
-                              final tel = client['telefono'] ?? client['phone'] ?? 'Sin teléfono';
-                              final correo = client['correo'] ?? client['email'] ?? '';
-
-                              return Container(
-                                decoration: BoxDecoration(
-                                  color: AppColors.surface,
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(color: AppColors.border),
+              : _hasSearched
+                  ? (_searchResults.isNotEmpty
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Resultados encontrados (${_searchResults.length}):',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textSecondary,
+                                fontSize: 13,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Expanded(
+                              child: ListView.separated(
+                                itemCount: _searchResults.length,
+                                separatorBuilder: (_, _) => const SizedBox(height: 8),
+                                itemBuilder: (context, index) => _buildClientCard(_searchResults[index]),
+                              ),
+                            ),
+                          ],
+                        )
+                      : Center(
+                          child: SingleChildScrollView(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.person_off_outlined, size: 54, color: AppColors.textSecondary),
+                                const SizedBox(height: 12),
+                                Text(
+                                  'No se encontró ningún cliente con "$_lastQuery"',
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
                                 ),
-                                child: ListTile(
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                                  leading: CircleAvatar(
-                                    backgroundColor: AppColors.primary.withOpacity(0.12),
-                                    child: const Icon(Icons.person, color: AppColors.primary),
-                                  ),
-                                  title: Text(nombre.toString(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                                  subtitle: Text('📞 $tel${correo.isNotEmpty ? ' • $correo' : ''}',
-                                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                                  trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: AppColors.primary),
-                                  onTap: () {
-                                    setState(() {
-                                      _selectedClient = client;
-                                      _currentStep = 2; // Go to Job Details
-                                    });
-                                  },
+                                const SizedBox(height: 8),
+                                const Text(
+                                  'Puedes buscar manualmente arriba o registrarlo con el botón de abajo.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
                                 ),
-                              );
-                            },
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
-                    )
-                  : _hasSearched
-                      ? Center(
+                        ))
+                  : (_isLoadingDefaultClients
+                      ? const Center(
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const Icon(Icons.person_off_outlined, size: 54, color: AppColors.textSecondary),
-                              const SizedBox(height: 12),
+                              CircularProgressIndicator(color: AppColors.primary),
+                              SizedBox(height: 12),
                               Text(
-                                'No se encontró ningún cliente con "$_lastQuery"',
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
-                              ),
-                              const SizedBox(height: 8),
-                              const Text(
-                                'Puedes registrarlo a continuación para asignarle el trabajo.',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                                'Cargando clientes...',
+                                style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
                               ),
                             ],
                           ),
                         )
-                      : Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                _searchByPhone ? Icons.phone_callback_outlined : Icons.manage_search_outlined,
-                                size: 54,
-                                color: AppColors.textSecondary.withOpacity(0.5),
+                      : _defaultClients.isNotEmpty
+                          ? Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      'Clientes Registrados (${_defaultClients.length}):',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.textSecondary,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                    Text(
+                                      _searchByPhone ? 'Filtro por teléfono' : 'Filtro por nombre',
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Expanded(
+                                  child: ListView.separated(
+                                    itemCount: _defaultClients.length,
+                                    separatorBuilder: (_, _) => const SizedBox(height: 8),
+                                    itemBuilder: (context, index) => _buildClientCard(_defaultClients[index]),
+                                  ),
+                                ),
+                              ],
+                            )
+                          : Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.people_outline,
+                                    size: 54,
+                                    color: AppColors.textSecondary.withValues(alpha: 0.5),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  const Text(
+                                    'No hay clientes registrados aún',
+                                    style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(height: 12),
-                              Text(
-                                _searchByPhone
-                                    ? 'Ingresa los 10 dígitos del teléfono'
-                                    : 'Escribe el nombre o apellido del cliente',
-                                style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
-                              ),
-                            ],
-                          ),
-                        ),
+                            )),
         ),
 
         const SizedBox(height: 12),
@@ -590,6 +702,42 @@ class _RegistroBottomSheetState extends ConsumerState<RegistroBottomSheet> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildClientCard(Map<String, dynamic> client) {
+    final nombre = client['nombre'] ?? client['name'] ?? 'Sin nombre';
+    final tel = client['telefono'] ?? client['phone'] ?? 'Sin teléfono';
+    final correo = client['correo'] ?? client['email'] ?? '';
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+        leading: CircleAvatar(
+          backgroundColor: AppColors.primary.withValues(alpha: 0.12),
+          child: const Icon(Icons.person, color: AppColors.primary),
+        ),
+        title: Text(
+          nombre.toString(),
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+        ),
+        subtitle: Text(
+          '📞 $tel${correo.isNotEmpty ? ' • $correo' : ''}',
+          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+        ),
+        trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: AppColors.primary),
+        onTap: () {
+          setState(() {
+            _selectedClient = client;
+            _currentStep = 2; // Go to Job Details
+          });
+        },
+      ),
     );
   }
 

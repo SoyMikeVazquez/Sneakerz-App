@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:sneakerz_app/core/constants/colors.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:sneakerz_app/core/widgets/streetwear_background.dart';
@@ -70,6 +71,8 @@ class BranchSelectionScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 16),
                   _buildBranchesList(ref, context),
+                  const SizedBox(height: 36),
+                  _buildFranchiseSection(context),
                   const SizedBox(height: 120),
                 ],
               ),
@@ -1033,4 +1036,297 @@ class BranchSelectionScreen extends ConsumerWidget {
       ),
     );
   }
+
+  Widget _buildFranchiseSection(BuildContext context) {
+    const franchiseUrl = 'https://guiadefranquicias.com/franquicia/688847';
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: const Color(0xFF141416),
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.stars, size: 14, color: Colors.amber),
+                    SizedBox(width: 5),
+                    Text(
+                      'FRANQUICIAS DISPONIBLES',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.verified, size: 13, color: Colors.blueAccent),
+                    SizedBox(width: 4),
+                    Text(
+                      'Oficial',
+                      style: TextStyle(fontSize: 10, color: Colors.white70, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            '¿Quieres abrir tu propia sucursal Sneakerz? 🚀',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+              color: Colors.white,
+              letterSpacing: -0.5,
+              height: 1.2,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Súmate a la marca referente en cuidado, restauración y personalización de calzado urbano. Un modelo de negocio rentable, validado y con alta demanda en todo México.',
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.white.withValues(alpha: 0.8),
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 18),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _buildFranchiseBadge('💼 Alta Rentabilidad'),
+              _buildFranchiseBadge('👟 Mercado en Crecimiento'),
+              _buildFranchiseBadge('🛠️ Capacitación Continua'),
+              _buildFranchiseBadge('📍 Territorios Exclusivos'),
+            ],
+          ),
+          const SizedBox(height: 22),
+          // Botón principal al formulario oficial de Guía de Franquicias
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: Colors.black,
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              ),
+              onPressed: () async {
+                final uri = Uri.parse(franchiseUrl);
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                } else if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('No se pudo abrir el enlace.')),
+                  );
+                }
+              },
+              icon: const Icon(Icons.open_in_new, size: 18, color: Colors.black),
+              label: const Text(
+                'Llenar Formulario Oficial',
+                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          // Botón secundario para ver más detalles en modal
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: Colors.white.withValues(alpha: 0.25)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              ),
+              onPressed: () => _showFranchiseInfoModal(context, franchiseUrl),
+              icon: const Icon(Icons.info_outline, size: 17, color: Colors.white),
+              label: const Text(
+                'Conoce los Requisitos',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Center(
+            child: Text(
+              'En convenio oficial con Guía de Franquicias México',
+              style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.5)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFranchiseBadge(String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
+  void _showFranchiseInfoModal(BuildContext context, String franchiseUrl) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: const BoxDecoration(
+          color: AppColors.background,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 44,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                const Icon(Icons.storefront_outlined, size: 24, color: AppColors.primary),
+                const SizedBox(width: 10),
+                const Text(
+                  'Franquicias Sneakerz',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(ctx),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              '¿Por qué invertir en una franquicia Sneakerz?',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            _buildModalBullet(
+              '👟 Negocio Especializado',
+              'El cuidado de calzado de colección y sneakers es una industria en pleno auge con clientes recurrentes y fieles.',
+            ),
+            _buildModalBullet(
+              '📦 Modelo Llave en Mano',
+              'Te entregamos el manual operativo, fórmulas profesionales, insumos y capacitación para ti y tu equipo.',
+            ),
+            _buildModalBullet(
+              '📍 Territorios Exclusivos',
+              'Protección geográfica de zona para asegurar el éxito y exclusividad de tu sucursal.',
+            ),
+            _buildModalBullet(
+              '📝 Contacto Directo',
+              'Envía tu información mediante el formulario oficial de Guía de Franquicias para recibir la ficha técnica y costos de inversión.',
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: AppColors.background,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+                onPressed: () async {
+                  Navigator.pop(ctx);
+                  final uri = Uri.parse(franchiseUrl);
+                  if (await canLaunchUrl(uri)) {
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  }
+                },
+                icon: const Icon(Icons.open_in_new, size: 18),
+                label: const Text(
+                  'Ir al Formulario Oficial de Franquicias',
+                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildModalBullet(String title, String description) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('• ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          Expanded(
+            child: RichText(
+              text: TextSpan(
+                style: const TextStyle(fontSize: 13, color: AppColors.textPrimary, height: 1.4),
+                children: [
+                  TextSpan(text: '$title: ', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  TextSpan(text: description, style: const TextStyle(color: AppColors.textSecondary)),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
+

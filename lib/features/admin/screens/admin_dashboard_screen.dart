@@ -114,7 +114,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen>
                 icon: const Icon(Icons.logout, color: AppColors.error),
                 onPressed: () async {
                   await ref.read(authNotifierProvider.notifier).signOut();
-                  if (context.mounted) context.go('/login');
+                  if (context.mounted) context.go('/');
                 },
               ),
             ],
@@ -2511,7 +2511,19 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen>
                         minimumSize: const Size(0, 32),
                       ),
                       onPressed: () {
-                        ref.read(adminOrdersNotifierProvider.notifier).updateOrderStatus(order['id'], 'completado', ref);
+                        ref.read(adminOrdersNotifierProvider.notifier).updateOrderStatus(
+                          order['id'],
+                          'completado',
+                          ref,
+                          orderData: order,
+                        );
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Orden completada. Se notificó al cliente por correo.'),
+                            backgroundColor: Colors.green,
+                            duration: Duration(seconds: 3),
+                          ),
+                        );
                       },
                       child: const Text('Completar', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                     ),
