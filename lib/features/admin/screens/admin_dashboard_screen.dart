@@ -18,6 +18,8 @@ import 'package:sneakerz_app/features/booking/providers/services_provider.dart';
 import 'package:sneakerz_app/features/admin/screens/branch_form_screen.dart';
 import 'package:sneakerz_app/features/admin/widgets/registro_bottom_sheet.dart';
 import 'package:sneakerz_app/features/admin/widgets/finanzas_bottom_sheet.dart';
+import 'package:sneakerz_app/features/admin/providers/admin_orders_provider.dart';
+import 'package:intl/intl.dart';
 
 class AdminDashboardScreen extends ConsumerStatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -37,7 +39,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen>
     if (_tabController != null && _lastIsSuperAdmin == isSuperAdmin) return;
     _tabController?.dispose();
     _lastIsSuperAdmin = isSuperAdmin;
-    _tabController = TabController(length: isSuperAdmin ? 5 : 4, vsync: this);
+    _tabController = TabController(length: isSuperAdmin ? 6 : 5, vsync: this);
     _tabController!.addListener(() {
       setState(() {});
     });
@@ -128,6 +130,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen>
                     tabs: [
                       const Tab(icon: Icon(Icons.analytics_outlined), text: 'Finanzas'),
                       const Tab(icon: Icon(Icons.inventory_outlined), text: 'Registros'),
+                      const Tab(icon: Icon(Icons.shopping_bag_outlined), text: 'Pedidos'),
                       const Tab(icon: Icon(Icons.inventory_2_outlined), text: 'Catálogo'),
                       const Tab(icon: Icon(Icons.storefront_outlined), text: 'Sucursales'),
                       if (isSuperAdmin)
@@ -149,6 +152,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen>
                       children: [
                         _buildFinancesTab(context),
                         _buildRegistrosTab(context),
+                        _buildPedidosTab(context),
                         _buildCatalogTab(context),
                         _buildBranchesTab(context, isSuperAdmin),
                         if (isSuperAdmin) _buildUsersTab(context, branchesAsync),
@@ -186,6 +190,8 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen>
                   label: const Text('Nuevo Registro', style: TextStyle(fontWeight: FontWeight.bold)),
                 )
               : _tabController?.index == 2
+              ? null
+              : _tabController?.index == 3
               ? FloatingActionButton.extended(
                   backgroundColor: AppColors.primary,
                   foregroundColor: AppColors.background,
@@ -202,7 +208,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen>
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                 )
-              : (_tabController?.index == 3
+              : (_tabController?.index == 4
                   ? FloatingActionButton.extended(
                       backgroundColor: AppColors.primary,
                       foregroundColor: AppColors.background,
@@ -210,7 +216,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen>
                       icon: const Icon(Icons.add_business),
                       label: const Text('Nueva Sucursal', style: TextStyle(fontWeight: FontWeight.bold)),
                     )
-                  : (_tabController?.index == 4 && isSuperAdmin
+                  : (_tabController?.index == 5 && isSuperAdmin
                       ? FloatingActionButton.extended(
                           backgroundColor: Colors.amber.shade700,
                           foregroundColor: Colors.black,
@@ -307,7 +313,15 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen>
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Resumen Financiero', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  const Expanded(
+                    child: Text(
+                      'Resumen Financiero',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   _buildDateRangePicker(context),
                 ],
               ),
@@ -2236,4 +2250,277 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen>
     );
   }
 
+  // TAB 3: PEDIDOS
+  Widget _buildPedidosTab(BuildContext context) {
+    final ordersAsync = ref.watch(adminOrdersProvider);
+
+    return ordersAsync.when(
+      data: (orders) {
+        if (orders.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.shopping_bag_outlined, size: 64, color: AppColors.textSecondary.withOpacity(0.5)),
+                const SizedBox(height: 16),
+                const Text('No hay pedidos registrados', style: TextStyle(color: AppColors.textSecondary)),
+              ],
+            ),
+          );
+        }
+
+        final pendingOrders = orders.where((o) => o['status'] == 'pending' || o['status'] == 'procesando').toList();
+        final completedOrders = orders.where((o) => o['status'] == 'completado' || o['status'] == 'entregado' || o['status'] == 'cancelado').toList();
+
+        return ListView(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          children: [
+            if (pendingOrders.isNotEmpty) ...[
+              const Text('Pendientes de Procesar', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 12),
+              ...pendingOrders.map((order) => _buildOrderCard(order)),
+              const SizedBox(height: 24),
+            ],
+            if (completedOrders.isNotEmpty) ...[
+              const Text('Historial de Pedidos', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 12),
+              ...completedOrders.map((order) => _buildOrderCard(order)),
+            ],
+            const SizedBox(height: 100),
+          ],
+        );
+      },
+      loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+      error: (e, _) => Center(child: Text('Error al cargar pedidos: $e')),
+    );
+  }
+
+  Widget _buildOrderCard(Map<String, dynamic> order) {
+    final status = order['status'] ?? 'pending';
+    final total = (order['total'] ?? 0).toString();
+    final date = order['created_at'] != null 
+        ? DateFormat('dd MMM yyyy, HH:mm').format(DateTime.parse(order['created_at']).toLocal())
+        : '';
+    final orderItems = (order['order_items'] as List?) ?? [];
+    
+    Color statusColor = Colors.orange;
+    String statusText = 'Pendiente';
+    if (status == 'completado' || status == 'entregado') {
+      statusColor = Colors.green;
+      statusText = 'Completado';
+    } else if (status == 'cancelado') {
+      statusColor = AppColors.error;
+      statusText = 'Cancelado';
+    }
+
+    final customerName = order['customer_name']?.toString() ?? '';
+    final customerPhone = order['customer_phone']?.toString() ?? '';
+    final customerEmail = order['customer_email']?.toString() ?? '';
+    final isDelivery = order['is_delivery'] == true;
+    final deliveryAddress = order['delivery_address']?.toString() ?? '';
+    final branchName = order['branch_name']?.toString() ?? '';
+    final shippingCost = (order['shipping_cost'] ?? 0).toString();
+    final distanceKm = order['delivery_distance_km'] != null ? '${order['delivery_distance_km']} km' : null;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Orden #${order['id'].toString().substring(0, 8).toUpperCase()}',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: statusColor.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  statusText.toUpperCase(),
+                  style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text('Fecha: $date', style: const TextStyle(color: AppColors.textSecondary, fontSize: 11)),
+          
+          // DATOS DEL CLIENTE
+          if (customerName.isNotEmpty || customerPhone.isNotEmpty || customerEmail.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.background,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (customerName.isNotEmpty)
+                    Row(
+                      children: [
+                        const Icon(Icons.person_outline, size: 14, color: AppColors.primary),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            customerName,
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                          ),
+                        ),
+                      ],
+                    ),
+                  if (customerPhone.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        const Icon(Icons.phone_outlined, size: 14, color: AppColors.textSecondary),
+                        const SizedBox(width: 6),
+                        Text(customerPhone, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                      ],
+                    ),
+                  ],
+                  if (customerEmail.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        const Icon(Icons.email_outlined, size: 14, color: AppColors.textSecondary),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            customerEmail,
+                            style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+
+          // DATOS DE ENVÍO A DOMICILIO SI APLICA
+          if (isDelivery) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.blue.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.blue.withOpacity(0.2)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.motorcycle, size: 15, color: Colors.blue),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Envío a Domicilio ${distanceKm != null ? '($distanceKm)' : ''}',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.blue),
+                      ),
+                      const Spacer(),
+                      Text('+\$$shippingCost', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.blue)),
+                    ],
+                  ),
+                  if (deliveryAddress.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Destino: $deliveryAddress',
+                      style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                  if (branchName.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      'Sucursal despacho: $branchName',
+                      style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+
+          const SizedBox(height: 10),
+          const Divider(),
+          const SizedBox(height: 6),
+
+          // LISTA DE ITEMS
+          ...orderItems.map((item) {
+            final isProduct = item['item_type'] == 'product';
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(
+                children: [
+                  Icon(isProduct ? Icons.inventory_2_outlined : Icons.cleaning_services_outlined, size: 14, color: AppColors.textSecondary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text('${item['quantity']}x ID:${item['item_id'].toString().substring(0, item['item_id'].toString().length > 6 ? 6 : item['item_id'].toString().length)}', style: const TextStyle(fontSize: 12)),
+                  ),
+                  Text('\$${item['price']}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                ],
+              ),
+            );
+          }),
+          const SizedBox(height: 8),
+          const Divider(),
+          const SizedBox(height: 6),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Total: \$$total MXN', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+              if (status == 'pending' || status == 'procesando')
+                Row(
+                  children: [
+                    if (status == 'pending') ...[
+                      OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          minimumSize: const Size(0, 32),
+                        ),
+                        onPressed: () {
+                          ref.read(adminOrdersNotifierProvider.notifier).updateOrderStatus(order['id'], 'procesando', ref);
+                        },
+                        child: const Text('Procesar', style: TextStyle(fontSize: 11)),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: AppColors.background,
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                        minimumSize: const Size(0, 32),
+                      ),
+                      onPressed: () {
+                        ref.read(adminOrdersNotifierProvider.notifier).updateOrderStatus(order['id'], 'completado', ref);
+                      },
+                      child: const Text('Completar', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }

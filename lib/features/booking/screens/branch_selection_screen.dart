@@ -12,6 +12,8 @@ import 'package:sneakerz_app/models/promo_model.dart';
 import 'package:sneakerz_app/models/service_model.dart';
 import 'package:sneakerz_app/models/product_model.dart';
 import 'package:sneakerz_app/features/admin/providers/admin_dashboard_provider.dart';
+import 'package:sneakerz_app/features/cart/providers/cart_provider.dart';
+import 'package:sneakerz_app/models/cart_item_model.dart';
 
 class BranchSelectionScreen extends ConsumerWidget {
   const BranchSelectionScreen({super.key});
@@ -36,7 +38,7 @@ class BranchSelectionScreen extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: 20),
-                    _buildHeader(context),
+                    _buildHeader(context, ref),
                     const SizedBox(height: 32),
                     
                     _buildSectionTitle(context, 'Promociones Especiales'),
@@ -79,26 +81,63 @@ class BranchSelectionScreen extends ConsumerWidget {
   );
 }
 
-  Widget _buildHeader(BuildContext context) {
-    return Column(
+  Widget _buildHeader(BuildContext context, WidgetRef ref) {
+    final cartItemCount = ref.watch(cartItemCountProvider);
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Bienvenido a',
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: AppColors.textSecondary,
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Bienvenido a',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+            ),
+            const SizedBox(height: 4),
+            Image.asset(
+              'assets/logo.png',
+              height: 40,
+              errorBuilder: (context, error, stackTrace) => Text(
+                'SNEAKERZ.',
+                style: Theme.of(context).textTheme.displayMedium?.copyWith(
+                      color: AppColors.primary,
+                    ),
               ),
+            ),
+          ],
         ),
-        const SizedBox(height: 4),
-        Image.asset(
-          'assets/logo.png',
-          height: 40,
-          errorBuilder: (context, error, stackTrace) => Text(
-            'SNEAKERZ.',
-            style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                  color: AppColors.primary,
+        Stack(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.shopping_cart_outlined, size: 28),
+              onPressed: () => context.push('/cart'),
+              color: AppColors.primary,
+            ),
+            if (cartItemCount > 0)
+              Positioned(
+                right: 4,
+                top: 4,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: const BoxDecoration(
+                    color: AppColors.error,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Text(
+                    cartItemCount.toString(),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
-          ),
+              ),
+          ],
         ),
       ],
     );
@@ -277,7 +316,7 @@ class BranchSelectionScreen extends ConsumerWidget {
                 imageUrl: service.imageUrl ?? '',
                 title: service.name,
                 price: service.price > 0 ? '\$${service.price.toStringAsFixed(0)}' : null,
-                onTap: () => _showServiceDetailBottomSheet(context, service),
+                onTap: () => _showServiceDetailBottomSheet(context, ref, service),
               ).animate().fade(duration: 600.ms, delay: (index * 100).ms).slideX(begin: 0.1, end: 0);
             },
           );
@@ -345,7 +384,7 @@ class BranchSelectionScreen extends ConsumerWidget {
                 imageUrl: product.imageUrl ?? '',
                 title: product.name,
                 price: product.price > 0 ? '\$${product.price.toStringAsFixed(0)}' : null,
-                onTap: () => _showProductDetailBottomSheet(context, product),
+                onTap: () => _showProductDetailBottomSheet(context, ref, product),
               ).animate().fade(duration: 600.ms, delay: (index * 100).ms).slideX(begin: 0.1, end: 0);
             },
           );
@@ -745,7 +784,7 @@ class BranchSelectionScreen extends ConsumerWidget {
   }
 
   // MODAL BOTTOM SHEET: SERVICIOS
-  void _showServiceDetailBottomSheet(BuildContext context, ServiceItem service) {
+  void _showServiceDetailBottomSheet(BuildContext context, WidgetRef ref, ServiceItem service) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -841,12 +880,24 @@ class BranchSelectionScreen extends ConsumerWidget {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
                 ),
                 onPressed: () {
+                  ref.read(cartProvider.notifier).addItem(
+                    CartItem(
+                      id: service.id,
+                      name: service.name,
+                      price: service.price,
+                      quantity: 1,
+                      imageUrl: service.imageUrl ?? '',
+                      type: 'service',
+                    )
+                  );
                   Navigator.pop(ctx);
-                  context.push('/booking');
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Servicio añadido al carrito')),
+                  );
                 },
-                icon: const Icon(Icons.check_circle_outline),
+                icon: const Icon(Icons.add_shopping_cart),
                 label: const Text(
-                  'Agendar este Servicio',
+                  'Añadir al carrito',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                 ),
               ),
@@ -859,7 +910,7 @@ class BranchSelectionScreen extends ConsumerWidget {
   }
 
   // MODAL BOTTOM SHEET: PRODUCTOS
-  void _showProductDetailBottomSheet(BuildContext context, ProductItem product) {
+  void _showProductDetailBottomSheet(BuildContext context, WidgetRef ref, ProductItem product) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -954,17 +1005,24 @@ class BranchSelectionScreen extends ConsumerWidget {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
                 ),
                 onPressed: () {
+                  ref.read(cartProvider.notifier).addItem(
+                    CartItem(
+                      id: product.id,
+                      name: product.name,
+                      price: product.price,
+                      quantity: 1,
+                      imageUrl: product.imageUrl ?? '',
+                      type: 'product',
+                    )
+                  );
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Puedes adquirir "${product.name}" en tu sucursal más cercana o al dejar tus tenis.'),
-                      backgroundColor: AppColors.primary,
-                    ),
+                    const SnackBar(content: Text('Producto añadido al carrito')),
                   );
                 },
-                icon: const Icon(Icons.storefront_outlined),
+                icon: const Icon(Icons.add_shopping_cart),
                 label: const Text(
-                  'Solicitar en Sucursal',
+                  'Añadir al carrito',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                 ),
               ),

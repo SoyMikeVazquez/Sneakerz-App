@@ -473,7 +473,7 @@ class _BranchFormScreenState extends ConsumerState<BranchFormScreen> {
                         title: const Text('¿Sucursal Abierta / Operativa?', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                         subtitle: const Text('Visible en la app para agendar citas y ubicar en el mapa', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                         value: _isOpen,
-                        activeColor: AppColors.primary,
+                        activeThumbColor: AppColors.primary,
                         onChanged: (val) => setState(() => _isOpen = val),
                       ),
                     ),
@@ -936,35 +936,40 @@ class _BranchFormScreenState extends ConsumerState<BranchFormScreen> {
 
   Widget _buildDayScheduleTile(DayScheduleItem day) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
         color: day.isActive ? Colors.white : Colors.grey[100],
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: day.isActive ? AppColors.primary.withValues(alpha: 0.3) : Colors.black12),
       ),
       child: Row(
         children: [
-          // Switch Activo
-          Switch(
-            value: day.isActive,
-            activeColor: AppColors.primary,
-            onChanged: (val) => setState(() => day.isActive = val),
+          // Switch Activo compacto
+          Transform.scale(
+            scale: 0.75,
+            child: Switch.adaptive(
+              value: day.isActive,
+              activeThumbColor: AppColors.primary,
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              onChanged: (val) => setState(() => day.isActive = val),
+            ),
           ),
           const SizedBox(width: 4),
-          // Nombre del Día
-          SizedBox(
-            width: 75,
+          // Nombre del Día flexible
+          Expanded(
             child: Text(
               day.label,
               style: TextStyle(
                 fontWeight: FontWeight.bold,
-                fontSize: 13,
+                fontSize: 12,
                 color: day.isActive ? AppColors.textPrimary : Colors.grey,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
-          const Spacer(),
+          const SizedBox(width: 4),
           // Horarios Apertura / Cierre
           if (day.isActive) ...[
             _buildTimePickerButton(
@@ -972,8 +977,8 @@ class _BranchFormScreenState extends ConsumerState<BranchFormScreen> {
               onSelected: (newTime) => setState(() => day.openTime = newTime),
             ),
             const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 6),
-              child: Text('-', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
+              padding: EdgeInsets.symmetric(horizontal: 4),
+              child: Text('-', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textSecondary, fontSize: 12)),
             ),
             _buildTimePickerButton(
               time: day.closeTime,
@@ -981,9 +986,9 @@ class _BranchFormScreenState extends ConsumerState<BranchFormScreen> {
             ),
           ] else ...[
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(10)),
-              child: const Text('Cerrado', style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold)),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(8)),
+              child: const Text('Cerrado', style: TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.bold)),
             ),
           ],
         ],
@@ -1010,22 +1015,22 @@ class _BranchFormScreenState extends ConsumerState<BranchFormScreen> {
           onSelected(picked);
         }
       },
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(8),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
         decoration: BoxDecoration(
           color: Colors.grey[100],
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(8),
           border: Border.all(color: Colors.black12),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.access_time, size: 13, color: AppColors.primary),
-            const SizedBox(width: 4),
+            const Icon(Icons.access_time, size: 12, color: AppColors.primary),
+            const SizedBox(width: 3),
             Text(
               time.format(context),
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
             ),
           ],
         ),

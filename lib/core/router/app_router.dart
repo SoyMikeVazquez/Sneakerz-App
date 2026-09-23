@@ -1,13 +1,13 @@
-import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sneakerz_app/features/home/screens/main_screen.dart';
-import 'package:sneakerz_app/features/booking/screens/branch_selection_screen.dart';
 import 'package:sneakerz_app/features/booking/screens/booking_screen.dart';
 import 'package:sneakerz_app/features/booking/screens/confirmation_screen.dart';
 import 'package:sneakerz_app/features/auth/screens/login_screen.dart';
 import 'package:sneakerz_app/features/auth/screens/register_screen.dart';
 import 'package:sneakerz_app/features/admin/screens/admin_dashboard_screen.dart';
+import 'package:sneakerz_app/features/cart/screens/cart_screen.dart';
+import 'package:sneakerz_app/features/cart/screens/checkout_screen.dart';
 
 final goRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
@@ -44,6 +44,14 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/admin',
         builder: (context, state) => const AdminDashboardScreen(),
+      ),
+      GoRoute(
+        path: '/cart',
+        builder: (context, state) => const CartScreen(),
+      ),
+      GoRoute(
+        path: '/checkout',
+        builder: (context, state) => const CheckoutScreen(),
       ),
     ],
   );
